@@ -35,9 +35,12 @@ namespace KVNC1EPTestApp
 
             try
             {
+                // 获取完整路径以便调试
+                string fullPath = Path.GetFullPath(csvFilePath);
+
                 if (!File.Exists(csvFilePath))
                 {
-                    lastError = $"找不到檔案: {csvFilePath}";
+                    lastError = $"找不到檔案: {fullPath}";
                     return false;
                 }
 

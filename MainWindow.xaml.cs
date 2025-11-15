@@ -56,17 +56,20 @@ namespace KVNC1EPTestApp
         /// </summary>
         private void TryLoadCSVConfig()
         {
+            string csvPath = System.IO.Path.GetFullPath("ERRORCODE.csv");
+            LogMessage($"正在讀取配置文件：{csvPath}");
+
             if (AlarmConfig.LoadFromCSV("ERRORCODE.csv"))
             {
                 CSVStatusTextBlock.Text = $"已加載 {AlarmConfig.Count} 筆配置";
                 CSVStatusTextBlock.Foreground = System.Windows.Media.Brushes.Green;
-                LogMessage($"成功加載 CSV 配置：{AlarmConfig.Count} 筆資料");
+                LogMessage($"✓ 成功加載 CSV 配置：{AlarmConfig.Count} 筆資料");
             }
             else
             {
                 CSVStatusTextBlock.Text = $"未加載 ({AlarmConfig.LastError})";
                 CSVStatusTextBlock.Foreground = System.Windows.Media.Brushes.Red;
-                LogMessage($"CSV 配置加載失敗：{AlarmConfig.LastError}");
+                LogMessage($"✗ CSV 配置加載失敗：{AlarmConfig.LastError}");
             }
         }
 
