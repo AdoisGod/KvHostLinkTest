@@ -10,7 +10,8 @@ namespace KVNC1EPTestApp
     {
         private string timestamp;
         private string address;
-        private string description;
+        private string name;        // 異常名稱 (對應CSV的C列)
+        private string details;     // 詳細內容 (對應CSV的D-J列)
 
         public string Timestamp
         {
@@ -32,13 +33,23 @@ namespace KVNC1EPTestApp
             }
         }
 
-        public string Description
+        public string Name
         {
-            get => description;
+            get => name;
             set
             {
-                description = value;
-                OnPropertyChanged(nameof(Description));
+                name = value;
+                OnPropertyChanged(nameof(Name));
+            }
+        }
+
+        public string Details
+        {
+            get => details;
+            set
+            {
+                details = value;
+                OnPropertyChanged(nameof(Details));
             }
         }
 

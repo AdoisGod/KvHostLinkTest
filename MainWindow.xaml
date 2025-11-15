@@ -57,14 +57,17 @@
         <StackPanel Grid.Row="3" Grid.ColumnSpan="2" Margin="10" Background="#F0F0F0">
             <TextBlock Text="持續監控設置" FontWeight="Bold" Foreground="#0066CC"/>
             <StackPanel Orientation="Horizontal" Margin="0,5,0,5">
-                <TextBlock Text="監控區域:" Width="100"/>
-                <TextBlock Text="起始地址:" Margin="5,0,5,0"/>
+                <Button x:Name="LoadCSVButton" Content="加載CSV配置" Width="120" Margin="0,0,15,0" Click="LoadCSVButton_Click" Background="#4CAF50" Foreground="White"/>
+                <TextBlock x:Name="CSVStatusTextBlock" Text="未加載" VerticalAlignment="Center" Margin="0,0,15,0"/>
+                <TextBlock Text="起始地址:" Margin="5,0,5,0" VerticalAlignment="Center"/>
                 <TextBox x:Name="MonitorStartAddressTextBox" Width="80" Text="0"/>
-                <TextBlock Text="結束地址:" Margin="15,0,5,0"/>
+                <TextBlock Text="結束地址:" Margin="15,0,5,0" VerticalAlignment="Center"/>
                 <TextBox x:Name="MonitorEndAddressTextBox" Width="80" Text="9915"/>
-                <TextBlock Text="掃描間隔(ms):" Margin="15,0,5,0"/>
+                <TextBlock Text="掃描間隔(ms):" Margin="15,0,5,0" VerticalAlignment="Center"/>
                 <TextBox x:Name="MonitorIntervalTextBox" Width="80" Text="1000"/>
-                <Button x:Name="StartMonitorButton" Content="開始監控" Width="100" Margin="15,0,5,0" Click="StartMonitorButton_Click"/>
+            </StackPanel>
+            <StackPanel Orientation="Horizontal" Margin="0,0,0,5">
+                <Button x:Name="StartMonitorButton" Content="開始監控" Width="100" Margin="0,0,5,0" Click="StartMonitorButton_Click"/>
                 <Button x:Name="StopMonitorButton" Content="停止監控" Width="100" Margin="5,0,5,0" Click="StopMonitorButton_Click" IsEnabled="False"/>
                 <Button x:Name="ClearAlarmsButton" Content="清除報警" Width="100" Margin="5,0,0,0" Click="ClearAlarmsButton_Click"/>
             </StackPanel>
@@ -83,8 +86,9 @@
                           CanUserAddRows="False">
                     <DataGrid.Columns>
                         <DataGridTextColumn Header="時間" Binding="{Binding Timestamp}" Width="130"/>
-                        <DataGridTextColumn Header="地址" Binding="{Binding Address}" Width="80"/>
-                        <DataGridTextColumn Header="描述" Binding="{Binding Description}" Width="*"/>
+                        <DataGridTextColumn Header="地址" Binding="{Binding Address}" Width="70"/>
+                        <DataGridTextColumn Header="異常名稱" Binding="{Binding Name}" Width="150"/>
+                        <DataGridTextColumn Header="詳細內容" Binding="{Binding Details}" Width="*"/>
                     </DataGrid.Columns>
                 </DataGrid>
             </GroupBox>

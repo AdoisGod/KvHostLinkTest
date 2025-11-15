@@ -46,6 +46,28 @@ namespace KVNC1EPTestApp
             // 初始化定時器
             monitorTimer = new DispatcherTimer();
             monitorTimer.Tick += MonitorTimer_Tick;
+
+            // 嘗試自動加載 CSV 配置
+            TryLoadCSVConfig();
+        }
+
+        /// <summary>
+        /// 嘗試加載 CSV 配置文件
+        /// </summary>
+        private void TryLoadCSVConfig()
+        {
+            if (AlarmConfig.LoadFromCSV("ERRORCODE.csv"))
+            {
+                CSVStatusTextBlock.Text = $"已加載 {AlarmConfig.Count} 筆配置";
+                CSVStatusTextBlock.Foreground = System.Windows.Media.Brushes.Green;
+                LogMessage($"成功加載 CSV 配置：{AlarmConfig.Count} 筆資料");
+            }
+            else
+            {
+                CSVStatusTextBlock.Text = $"未加載 ({AlarmConfig.LastError})";
+                CSVStatusTextBlock.Foreground = System.Windows.Media.Brushes.Red;
+                LogMessage($"CSV 配置加載失敗：{AlarmConfig.LastError}");
+            }
         }
 
           private void DeviceTypeComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -254,6 +276,14 @@ namespace KVNC1EPTestApp
         #region 監控功能
 
         /// <summary>
+        /// 加載 CSV 配置按鈕點擊事件
+        /// </summary>
+        private void LoadCSVButton_Click(object sender, RoutedEventArgs e)
+        {
+            TryLoadCSVConfig();
+        }
+
+        /// <summary>
         /// 開始監控按鈕點擊事件
         /// </summary>
         private void StartMonitorButton_Click(object sender, RoutedEventArgs e)
@@ -413,7 +443,7 @@ namespace KVNC1EPTestApp
         /// </summary>
         private void OnAlarmTriggered(int address)
         {
-            string description = AlarmConfig.GetDescription(address);
+            AlarmDetail detail = AlarmConfig.GetAlarmDetail(address);
             string addressString = $"R{address:D4}";
             string timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
 
@@ -422,13 +452,14 @@ namespace KVNC1EPTestApp
             {
                 Timestamp = timestamp,
                 Address = addressString,
-                Description = description
+                Name = detail.Name,
+                Details = detail.Details
             };
 
             activeAlarms.Insert(0, alarmInfo); // 插入到最前面
 
             // 記錄到日誌
-            LogMessage($"[報警] {addressString} - {description}");
+            LogMessage($"[報警] {addressString} - {detail.Name}: {detail.Details}");
         }
 
         /// <summary>
