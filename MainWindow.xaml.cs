@@ -304,8 +304,24 @@ namespace KVNC1EPTestApp
                 monitorEndAddress = int.Parse(MonitorEndAddressTextBox.Text);
                 int interval = int.Parse(MonitorIntervalTextBox.Text);
 
-                // 驗證參數
-                if (monitorStartAddress < 0 || monitorEndAddress < monitorStartAddress)
+                // 驗證R地址是否有效
+                if (!RAddressHelper.IsValidRAddress(monitorStartAddress))
+                {
+                    LogMessage($"起始地址 R{monitorStartAddress:D4} 無效（後兩位必須在00-15之間）");
+                    return;
+                }
+
+                if (!RAddressHelper.IsValidRAddress(monitorEndAddress))
+                {
+                    LogMessage($"結束地址 R{monitorEndAddress:D4} 無效（後兩位必須在00-15之間）");
+                    return;
+                }
+
+                // 轉換為線性索引
+                int startIndex = RAddressHelper.RAddressNumToIndex(monitorStartAddress);
+                int endIndex = RAddressHelper.RAddressNumToIndex(monitorEndAddress);
+
+                if (startIndex < 0 || endIndex < startIndex)
                 {
                     LogMessage("監控地址範圍無效");
                     return;
@@ -317,8 +333,8 @@ namespace KVNC1EPTestApp
                     return;
                 }
 
-                // 初始化狀態緩存
-                int totalBits = monitorEndAddress - monitorStartAddress + 1;
+                // 初始化狀態緩存（基於線性索引範圍）
+                int totalBits = endIndex - startIndex + 1;
                 previousStates = new bool[totalBits];
 
                 // 啟動定時器
@@ -332,7 +348,7 @@ namespace KVNC1EPTestApp
                 MonitorEndAddressTextBox.IsEnabled = false;
                 MonitorIntervalTextBox.IsEnabled = false;
 
-                LogMessage($"開始監控 R{monitorStartAddress} 到 R{monitorEndAddress}，間隔 {interval}ms");
+                LogMessage($"開始監控 R{monitorStartAddress:D4} 到 R{monitorEndAddress:D4}，共 {totalBits} 個位址，間隔 {interval}ms");
             }
             catch (Exception ex)
             {
@@ -391,53 +407,88 @@ namespace KVNC1EPTestApp
 
         /// <summary>
         /// 執行監控掃描
+        /// R地址規則：後兩位是16進制(00-15)，需要分組讀取
+        /// 例如：R000-R015是一組，R100-R115是一組
         /// </summary>
         private void PerformMonitorScan()
         {
-            int totalBits = monitorEndAddress - monitorStartAddress + 1;
-            byte[] readData = new byte[(totalBits + 7) / 8];
+            // 轉換為線性索引
+            int startIndex = RAddressHelper.RAddressNumToIndex(monitorStartAddress);
+            int endIndex = RAddressHelper.RAddressNumToIndex(monitorEndAddress);
 
-            // 讀取R區域數據
-            int errCode = kvSockets.ReadDevices("R", monitorStartAddress, readData.Length, ref readData);
+            int currentStateIndex = 0;  // 當前狀態數組的索引
 
-            if (errCode != 0)
+            // 按組掃描（每組16個R位）
+            int startGroup = startIndex / 16;  // 起始組號
+            int endGroup = endIndex / 16;      // 結束組號
+
+            for (int group = startGroup; group <= endGroup; group++)
             {
-                LogMessage($"監控讀取錯誤: {kvSockets.ErrMsg(errCode)}");
-                return;
-            }
+                // 計算這一組的起始和結束R地址
+                int groupStartIndex = group * 16;
+                int groupEndIndex = Math.Min(groupStartIndex + 15, endIndex);
 
-            // 檢測狀態變化
-            DetectStateChanges(readData, totalBits);
+                // 如果起始組，可能不是從組的開頭開始
+                if (group == startGroup)
+                    groupStartIndex = startIndex;
+
+                // 計算這一組要讀取的R位數量
+                int bitsInGroup = groupEndIndex - groupStartIndex + 1;
+
+                // 轉換索引為R地址
+                int groupStartAddr = RAddressHelper.IndexToRAddressNum(groupStartIndex);
+                int groupEndAddr = RAddressHelper.IndexToRAddressNum(groupEndIndex);
+
+                // 讀取這一組的數據
+                byte[] readData = new byte[(bitsInGroup + 7) / 8];
+                int errCode = kvSockets.ReadDevices("R", groupStartAddr, readData.Length, ref readData);
+
+                if (errCode != 0)
+                {
+                    LogMessage($"監控讀取錯誤 R{groupStartAddr:D4}-R{groupEndAddr:D4}: {kvSockets.ErrMsg(errCode)}");
+                    continue;
+                }
+
+                // 檢測這一組的狀態變化
+                DetectStateChangesInGroup(readData, bitsInGroup, groupStartIndex, ref currentStateIndex);
+            }
         }
 
         /// <summary>
-        /// 檢測狀態變化（上升沿檢測）
+        /// 檢測一組內的狀態變化（上升沿/下降沿檢測）
         /// </summary>
-        private void DetectStateChanges(byte[] currentData, int totalBits)
+        /// <param name="currentData">當前讀取的數據</param>
+        /// <param name="bitsInGroup">這一組的位數</param>
+        /// <param name="groupStartIndex">這一組的起始線性索引</param>
+        /// <param name="stateArrayIndex">狀態數組的當前索引（引用傳遞，會自動遞增）</param>
+        private void DetectStateChangesInGroup(byte[] currentData, int bitsInGroup, int groupStartIndex, ref int stateArrayIndex)
         {
-            for (int i = 0; i < totalBits; i++)
+            for (int i = 0; i < bitsInGroup; i++)
             {
                 // 讀取當前位狀態
                 bool currentState = (currentData[i / 8] & (1 << (i % 8))) != 0;
-                bool previousState = previousStates[i];
+                bool previousState = previousStates[stateArrayIndex];
+
+                // 計算實際的R地址
+                int currentIndex = groupStartIndex + i;
+                int rAddress = RAddressHelper.IndexToRAddressNum(currentIndex);
 
                 // 檢測上升沿（0->1）
                 if (currentState && !previousState)
                 {
                     // 狀態從0變為1，觸發報警
-                    int address = monitorStartAddress + i;
-                    OnAlarmTriggered(address);
+                    OnAlarmTriggered(rAddress);
                 }
                 // 檢測下降沿（1->0）
                 else if (!currentState && previousState)
                 {
                     // 狀態從1變為0，移除報警
-                    int address = monitorStartAddress + i;
-                    OnAlarmCleared(address);
+                    OnAlarmCleared(rAddress);
                 }
 
                 // 更新狀態緩存
-                previousStates[i] = currentState;
+                previousStates[stateArrayIndex] = currentState;
+                stateArrayIndex++;
             }
         }
 

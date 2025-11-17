@@ -73,6 +73,7 @@
     </Compile>
     <Compile Include="AlarmInfo.cs" />
     <Compile Include="AlarmConfig.cs" />
+    <Compile Include="RAddressHelper.cs" />
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Properties\AssemblyInfo.cs">
