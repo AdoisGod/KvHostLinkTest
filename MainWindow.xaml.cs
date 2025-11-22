@@ -30,6 +30,7 @@ namespace KVNC1EPTestApp
 
         // PLC控制狀態監控
         private bool servoOnState = false;  // MR10200的當前狀態
+        private DispatcherTimer servoMonitorTimer;  // 獨立的伺服狀態監控定時器
 
         public MainWindow()
         {
@@ -135,6 +136,9 @@ namespace KVNC1EPTestApp
                 {
                     LogMessage("成功連接到 PLC");
                     ConnectButton.IsEnabled = false;
+
+                    // 啟動伺服狀態監控定時器
+                    StartServoMonitoring();
                 }
             }
             catch (Exception ex)
@@ -444,7 +448,6 @@ namespace KVNC1EPTestApp
                 PerformMonitorScan();
                 MonitorZoneFlags();  // 同時監控Zone旗標
                 MonitorPCResponse();  // PC模擬回應監控
-                MonitorServoState();  // 監控伺服狀態
             }
             catch (Exception ex)
             {
@@ -732,6 +735,30 @@ namespace KVNC1EPTestApp
         #endregion
 
         #region PLC控制功能
+
+        /// <summary>
+        /// 啟動伺服狀態監控
+        /// </summary>
+        private void StartServoMonitoring()
+        {
+            if (servoMonitorTimer == null)
+            {
+                servoMonitorTimer = new DispatcherTimer();
+                servoMonitorTimer.Interval = TimeSpan.FromMilliseconds(500);  // 每500ms檢查一次
+                servoMonitorTimer.Tick += ServoMonitorTimer_Tick;
+            }
+
+            servoMonitorTimer.Start();
+            LogMessage("已啟動伺服狀態監控");
+        }
+
+        /// <summary>
+        /// 伺服監控定時器Tick事件
+        /// </summary>
+        private void ServoMonitorTimer_Tick(object sender, EventArgs e)
+        {
+            MonitorServoState();
+        }
 
         /// <summary>
         /// 全軸伺服啟動按鈕 - 切換模式

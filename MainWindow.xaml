@@ -15,7 +15,35 @@
                 <TextBox x:Name="IpAddressTextBox" Width="120" Text="192.168.0.10"/>
                 <TextBlock Text="端口:" Margin="10,0,0,0" VerticalAlignment="Center"/>
                 <TextBox x:Name="PortTextBox" Width="60" Text="8501"/>
-                <Button x:Name="ConnectButton" Content="連接PLC" Width="100" Margin="15,0,0,0" Click="ConnectButton_Click" Background="#4CAF50" Foreground="White"/>
+                <Button x:Name="ConnectButton" Content="連接PLC" Width="100" Margin="15,0,0,0" Click="ConnectButton_Click" Background="#4CAF50" Foreground="White">
+                    <Button.Style>
+                        <Style TargetType="Button">
+                            <Setter Property="Background" Value="#4CAF50"/>
+                            <Setter Property="Foreground" Value="White"/>
+                            <Setter Property="BorderBrush" Value="#388E3C"/>
+                            <Setter Property="BorderThickness" Value="1"/>
+                            <Setter Property="Template">
+                                <Setter.Value>
+                                    <ControlTemplate TargetType="Button">
+                                        <Border Background="{TemplateBinding Background}"
+                                                BorderBrush="{TemplateBinding BorderBrush}"
+                                                BorderThickness="{TemplateBinding BorderThickness}"
+                                                CornerRadius="3">
+                                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                        </Border>
+                                    </ControlTemplate>
+                                </Setter.Value>
+                            </Setter>
+                            <Style.Triggers>
+                                <Trigger Property="IsEnabled" Value="False">
+                                    <Setter Property="Background" Value="#81C784"/>
+                                    <Setter Property="Foreground" Value="White"/>
+                                    <Setter Property="Opacity" Value="0.8"/>
+                                </Trigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Button.Style>
+                </Button>
             </StackPanel>
         </StackPanel>
 
