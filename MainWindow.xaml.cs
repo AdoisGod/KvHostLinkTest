@@ -24,6 +24,10 @@ namespace KVNC1EPTestApp
         private bool[] previousZoneReadyStates;  // 存儲Zone就緒旗標的前一次狀態
         private string zoneSavePath = "";
 
+        // PC模擬回應相關成員變量
+        private PCResponseManager pcResponseManager;
+        private bool pcResponseEnabled = false;
+
         public MainWindow()
         {
             InitializeComponent();
@@ -378,8 +382,33 @@ namespace KVNC1EPTestApp
         /// </summary>
         private void ClearAlarmsButton_Click(object sender, RoutedEventArgs e)
         {
-            activeAlarms.Clear();
-            LogMessage("已清除所有報警記錄");
+            if (kvSockets == null)
+            {
+                LogMessage("請先連接到 PLC");
+                return;
+            }
+
+            try
+            {
+                // 寫入 MR109 = ON
+                byte[] writeData = new byte[2];
+                writeData[0] = 0x01;
+                int errCode = kvSockets.WriteDevices("MR", 109, 1, ref writeData);
+
+                if (errCode != 0)
+                {
+                    LogMessage($"清除報警失敗: {kvSockets.ErrMsg(errCode)}");
+                    return;
+                }
+
+                // 清空UI報警列表
+                activeAlarms.Clear();
+                LogMessage("已發送清除報警命令 (MR109=ON) 並清除顯示");
+            }
+            catch (Exception ex)
+            {
+                LogMessage($"清除報警異常: {ex.Message}");
+            }
         }
 
         /// <summary>
@@ -411,6 +440,7 @@ namespace KVNC1EPTestApp
             {
                 PerformMonitorScan();
                 MonitorZoneFlags();  // 同時監控Zone旗標
+                MonitorPCResponse();  // PC模擬回應監控
             }
             catch (Exception ex)
             {
@@ -693,6 +723,163 @@ namespace KVNC1EPTestApp
                 ZoneStatusTextBlock.Foreground = System.Windows.Media.Brushes.Gray;
                 LogMessage("Zone數據監控已停止");
             }
+        }
+
+        #endregion
+
+        #region PLC控制功能
+
+        /// <summary>
+        /// 全軸伺服啟動按鈕
+        /// </summary>
+        private void ServoOnButton_Click(object sender, RoutedEventArgs e)
+        {
+            WriteMRCommand(10200, "全軸伺服啟動");
+        }
+
+        /// <summary>
+        /// 原點復歸按鈕
+        /// </summary>
+        private void HomeReturnButton_Click(object sender, RoutedEventArgs e)
+        {
+            WriteMRCommand(30000, "原點復歸");
+        }
+
+        /// <summary>
+        /// 通用MR寫入命令函數
+        /// </summary>
+        private void WriteMRCommand(int mrAddress, string commandName)
+        {
+            if (kvSockets == null)
+            {
+                AppendControlLog("請先連接到 PLC");
+                return;
+            }
+
+            try
+            {
+                byte[] writeData = new byte[2];
+                writeData[0] = 0x01;
+                int errCode = kvSockets.WriteDevices("MR", mrAddress, 1, ref writeData);
+
+                if (errCode != 0)
+                {
+                    AppendControlLog($"{commandName} 失敗: {kvSockets.ErrMsg(errCode)}");
+                }
+                else
+                {
+                    AppendControlLog($"✓ {commandName} 命令已發送 (MR{mrAddress}=ON)");
+                }
+            }
+            catch (Exception ex)
+            {
+                AppendControlLog($"{commandName} 異常: {ex.Message}");
+            }
+        }
+
+        #endregion
+
+        #region PC模擬回應功能
+
+        /// <summary>
+        /// PC模擬回應開關變更事件
+        /// </summary>
+        private void EnablePCResponseCheckBox_Changed(object sender, RoutedEventArgs e)
+        {
+            pcResponseEnabled = EnablePCResponseCheckBox.IsChecked == true;
+
+            if (pcResponseEnabled)
+            {
+                // 初始化PC響應管理器
+                if (kvSockets != null)
+                {
+                    pcResponseManager = new PCResponseManager(kvSockets);
+
+                    // 設置延遲時間
+                    UpdatePCResponseDelay();
+
+                    AppendControlLog("✓ PC模擬回應已啟用");
+                }
+                else
+                {
+                    EnablePCResponseCheckBox.IsChecked = false;
+                    pcResponseEnabled = false;
+                    AppendControlLog("請先連接到 PLC");
+                }
+            }
+            else
+            {
+                pcResponseManager = null;
+                AppendControlLog("PC模擬回應已禁用");
+            }
+        }
+
+        /// <summary>
+        /// 重置計數按鈕
+        /// </summary>
+        private void ResetCountButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (pcResponseManager != null)
+            {
+                pcResponseManager.ResetCount();
+                ResponseCountTextBlock.Text = "0";
+                AppendControlLog("已重置回應計數");
+            }
+        }
+
+        /// <summary>
+        /// 更新PC響應延遲時間
+        /// </summary>
+        private void UpdatePCResponseDelay()
+        {
+            if (pcResponseManager != null)
+            {
+                int delay = 1;
+                if (int.TryParse(ResponseDelayTextBox.Text, out int parsedDelay) && parsedDelay > 0)
+                {
+                    delay = parsedDelay;
+                }
+                pcResponseManager.SetResponseDelay(delay);
+            }
+        }
+
+        /// <summary>
+        /// 監控PC模擬回應（在定時器中調用）
+        /// </summary>
+        private void MonitorPCResponse()
+        {
+            if (!pcResponseEnabled || pcResponseManager == null)
+            {
+                return;
+            }
+
+            // 更新延遲時間（以防用戶修改）
+            UpdatePCResponseDelay();
+
+            // 監控Trigger並自動回應
+            pcResponseManager.MonitorTriggers(AppendControlLog);
+
+            // 更新計數顯示
+            Dispatcher.Invoke(() =>
+            {
+                ResponseCountTextBlock.Text = pcResponseManager.ResponseCount.ToString();
+            });
+        }
+
+        #endregion
+
+        #region 輔助函數
+
+        /// <summary>
+        /// 附加控制日誌（顯示在PLC控制&PC模擬Tab）
+        /// </summary>
+        private void AppendControlLog(string message)
+        {
+            Dispatcher.Invoke(() =>
+            {
+                ControlLogTextBox.AppendText($"{DateTime.Now:yyyy-MM-dd HH:mm:ss} - {message}\n");
+                ControlLogTextBox.ScrollToEnd();
+            });
         }
 
         #endregion

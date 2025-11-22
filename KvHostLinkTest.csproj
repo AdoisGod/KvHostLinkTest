@@ -78,6 +78,8 @@
     <Compile Include="ZoneConfig.cs" />
     <Compile Include="ZoneDataManager.cs" />
     <Compile Include="ExcelExporter.cs" />
+    <Compile Include="PCResponseConfig.cs" />
+    <Compile Include="PCResponseManager.cs" />
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Properties\AssemblyInfo.cs">

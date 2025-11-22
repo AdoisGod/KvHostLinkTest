@@ -140,7 +140,8 @@ namespace KVNC1EPTestApp
 
             try
             {
-                byte[] writeData = new byte[1];
+                // 使用更大的緩衝區以避免數組長度問題
+                byte[] writeData = new byte[2];  // 增加緩衝區大小
                 if (value)
                 {
                     writeData[0] = 0x01;
