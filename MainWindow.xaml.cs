@@ -28,6 +28,9 @@ namespace KVNC1EPTestApp
         private PCResponseManager pcResponseManager;
         private bool pcResponseEnabled = false;
 
+        // PLC控制狀態監控
+        private bool servoOnState = false;  // MR10200的當前狀態
+
         public MainWindow()
         {
             InitializeComponent();
@@ -441,6 +444,7 @@ namespace KVNC1EPTestApp
                 PerformMonitorScan();
                 MonitorZoneFlags();  // 同時監控Zone旗標
                 MonitorPCResponse();  // PC模擬回應監控
+                MonitorServoState();  // 監控伺服狀態
             }
             catch (Exception ex)
             {
@@ -730,11 +734,38 @@ namespace KVNC1EPTestApp
         #region PLC控制功能
 
         /// <summary>
-        /// 全軸伺服啟動按鈕
+        /// 全軸伺服啟動按鈕 - 切換模式
         /// </summary>
         private void ServoOnButton_Click(object sender, RoutedEventArgs e)
         {
-            WriteMRCommand(10200, "全軸伺服啟動");
+            if (kvSockets == null)
+            {
+                AppendControlLog("請先連接到 PLC");
+                return;
+            }
+
+            try
+            {
+                // 發送反向信號
+                byte[] writeData = new byte[2];
+                writeData[0] = (byte)(servoOnState ? 0x00 : 0x01);  // 當前ON則發OFF，當前OFF則發ON
+
+                int errCode = kvSockets.WriteDevices("MR", 10200, 1, ref writeData);
+
+                if (errCode != 0)
+                {
+                    AppendControlLog($"全軸伺服切換失敗: {kvSockets.ErrMsg(errCode)}");
+                }
+                else
+                {
+                    string action = servoOnState ? "關閉" : "啟動";
+                    AppendControlLog($"✓ 全軸伺服{action}命令已發送 (MR10200={(servoOnState ? "OFF" : "ON")})");
+                }
+            }
+            catch (Exception ex)
+            {
+                AppendControlLog($"全軸伺服切換異常: {ex.Message}");
+            }
         }
 
         /// <summary>
@@ -774,6 +805,41 @@ namespace KVNC1EPTestApp
             catch (Exception ex)
             {
                 AppendControlLog($"{commandName} 異常: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// 監控伺服狀態（在定時器中調用）
+        /// </summary>
+        private void MonitorServoState()
+        {
+            if (kvSockets == null)
+                return;
+
+            try
+            {
+                // 讀取MR10200狀態
+                byte[] readData = new byte[2];
+                int errCode = kvSockets.ReadDevices("MR", 10200, 1, ref readData);
+
+                if (errCode == 0)
+                {
+                    bool currentState = (readData[0] & 0x01) != 0;
+
+                    // 更新狀態和按鈕文字
+                    if (currentState != servoOnState)
+                    {
+                        servoOnState = currentState;
+                        Dispatcher.Invoke(() =>
+                        {
+                            ServoOnButton.Content = servoOnState ? "全軸伺服關閉" : "全軸伺服啟動";
+                        });
+                    }
+                }
+            }
+            catch
+            {
+                // 讀取失敗，忽略
             }
         }
 
@@ -823,6 +889,7 @@ namespace KVNC1EPTestApp
             {
                 pcResponseManager.ResetCount();
                 ResponseCountTextBlock.Text = "0";
+                UpdateGroupCounts();
                 AppendControlLog("已重置回應計數");
             }
         }
@@ -859,11 +926,34 @@ namespace KVNC1EPTestApp
             // 監控Trigger並自動回應
             pcResponseManager.MonitorTriggers(AppendControlLog);
 
-            // 更新計數顯示
+            // 更新總計數顯示
             Dispatcher.Invoke(() =>
             {
-                ResponseCountTextBlock.Text = pcResponseManager.ResponseCount.ToString();
+                ResponseCountTextBlock.Text = pcResponseManager.TotalResponseCount.ToString();
+
+                // 更新每組計數顯示
+                UpdateGroupCounts();
             });
+        }
+
+        /// <summary>
+        /// 更新每組計數顯示
+        /// </summary>
+        private void UpdateGroupCounts()
+        {
+            if (pcResponseManager == null || GroupCountsTextBlock == null)
+                return;
+
+            var counts = pcResponseManager.ResponseCounts;
+            var pairs = PCResponseConfig.ResponsePairs;
+
+            var lines = new System.Text.StringBuilder();
+            for (int i = 0; i < pairs.Length; i++)
+            {
+                lines.AppendLine($"{pairs[i].Name}: {counts[i]}");
+            }
+
+            GroupCountsTextBlock.Text = lines.ToString().TrimEnd();
         }
 
         #endregion

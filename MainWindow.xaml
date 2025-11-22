@@ -123,18 +123,31 @@
                     </GroupBox>
 
                     <GroupBox Grid.Row="1" Header="PC自動回應模擬" Margin="0,0,0,10">
-                        <StackPanel Margin="10">
-                            <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
-                                <CheckBox x:Name="EnablePCResponseCheckBox" Content="啟用模擬PC回應" VerticalAlignment="Center" Margin="0,0,20,0" Checked="EnablePCResponseCheckBox_Changed" Unchecked="EnablePCResponseCheckBox_Changed"/>
-                                <TextBlock Text="回應延遲:" VerticalAlignment="Center" Margin="0,0,5,0"/>
-                                <TextBox x:Name="ResponseDelayTextBox" Width="80" Text="500" VerticalAlignment="Center"/>
-                                <TextBlock Text="ms" VerticalAlignment="Center" Margin="5,0,20,0"/>
-                                <TextBlock Text="回應計數:" VerticalAlignment="Center" Margin="0,0,5,0"/>
-                                <TextBlock x:Name="ResponseCountTextBlock" Text="0" VerticalAlignment="Center" FontWeight="Bold" Foreground="#4CAF50"/>
-                                <Button x:Name="ResetCountButton" Content="重置" Width="60" Margin="10,0,0,0" Click="ResetCountButton_Click"/>
+                        <Grid Margin="10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+
+                            <StackPanel Grid.Column="0">
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                                    <CheckBox x:Name="EnablePCResponseCheckBox" Content="啟用模擬PC回應" VerticalAlignment="Center" Margin="0,0,20,0" Checked="EnablePCResponseCheckBox_Changed" Unchecked="EnablePCResponseCheckBox_Changed"/>
+                                    <TextBlock Text="回應延遲:" VerticalAlignment="Center" Margin="0,0,5,0"/>
+                                    <TextBox x:Name="ResponseDelayTextBox" Width="80" Text="500" VerticalAlignment="Center"/>
+                                    <TextBlock Text="ms" VerticalAlignment="Center" Margin="5,0,20,0"/>
+                                    <TextBlock Text="總計數:" VerticalAlignment="Center" Margin="0,0,5,0"/>
+                                    <TextBlock x:Name="ResponseCountTextBlock" Text="0" VerticalAlignment="Center" FontWeight="Bold" Foreground="#4CAF50"/>
+                                    <Button x:Name="ResetCountButton" Content="重置" Width="60" Margin="10,0,0,0" Click="ResetCountButton_Click"/>
+                                </StackPanel>
+                                <TextBlock Text="監控9組拍照Trigger，自動發送Response（上升沿觸發）" Foreground="Gray" FontSize="11"/>
                             </StackPanel>
-                            <TextBlock Text="監控9組拍照Trigger，自動發送Response（上升沿觸發）" Foreground="Gray" FontSize="11"/>
-                        </StackPanel>
+
+                            <GroupBox Grid.Column="1" Header="各組計數" Margin="10,0,0,0" Width="200">
+                                <ScrollViewer VerticalScrollBarVisibility="Auto" MaxHeight="150">
+                                    <TextBlock x:Name="GroupCountsTextBlock" FontFamily="Consolas" FontSize="11" Foreground="#555"/>
+                                </ScrollViewer>
+                            </GroupBox>
+                        </Grid>
                     </GroupBox>
 
                     <GroupBox Grid.Row="2" Header="操作日誌">

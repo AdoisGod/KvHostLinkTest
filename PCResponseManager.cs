@@ -12,16 +12,26 @@ namespace KVNC1EPTestApp
         private KvHostlinkLib.KvHostlinkLib kvSockets;
         private bool[] previousTriggerStates;  // 存儲前一次的Trigger狀態
         private int responseDelayMs;           // 回應延遲時間（毫秒）
-        private int responseCount;             // 回應計數
+        private int[] responseCounts;          // 每組的回應計數
 
-        public int ResponseCount => responseCount;
+        public int[] ResponseCounts => responseCounts;
+        public int TotalResponseCount
+        {
+            get
+            {
+                int total = 0;
+                for (int i = 0; i < responseCounts.Length; i++)
+                    total += responseCounts[i];
+                return total;
+            }
+        }
 
         public PCResponseManager(KvHostlinkLib.KvHostlinkLib kvSockets)
         {
             this.kvSockets = kvSockets;
             this.previousTriggerStates = new bool[PCResponseConfig.ResponsePairs.Length];
+            this.responseCounts = new int[PCResponseConfig.ResponsePairs.Length];
             this.responseDelayMs = 1;
-            this.responseCount = 0;
         }
 
         /// <summary>
@@ -37,7 +47,8 @@ namespace KVNC1EPTestApp
         /// </summary>
         public void ResetCount()
         {
-            responseCount = 0;
+            for (int i = 0; i < responseCounts.Length; i++)
+                responseCounts[i] = 0;
         }
 
         /// <summary>
@@ -55,8 +66,8 @@ namespace KVNC1EPTestApp
                 // 檢測上升沿（0→1）
                 if (currentState && !previousTriggerStates[i])
                 {
-                    // 觸發回應（異步延遲）
-                    TriggerResponse(pair, logCallback);
+                    // 觸發回應（異步延遲），傳遞索引
+                    TriggerResponse(i, pair, logCallback);
                 }
 
                 // 更新狀態
@@ -90,7 +101,7 @@ namespace KVNC1EPTestApp
         /// <summary>
         /// 觸發自動回應（異步延遲後寫入Response）
         /// </summary>
-        private void TriggerResponse(PCResponsePair pair, Action<string> logCallback)
+        private void TriggerResponse(int index, PCResponsePair pair, Action<string> logCallback)
         {
             logCallback?.Invoke($"[PC模擬] 檢測到 {pair.Name} Trigger (MR{pair.TriggerAddress})");
 
@@ -112,8 +123,9 @@ namespace KVNC1EPTestApp
 
                     if (errCode == 0)
                     {
-                        Interlocked.Increment(ref responseCount);
-                        logCallback?.Invoke($"[PC模擬] 已回應 {pair.Name} Response (MR{pair.ResponseAddress}) - 計數:{responseCount}");
+                        Interlocked.Increment(ref responseCounts[index]);
+                        int count = responseCounts[index];
+                        logCallback?.Invoke($"[PC模擬] 已回應 {pair.Name} Response (MR{pair.ResponseAddress}) - 本組計數:{count}");
                     }
                     else
                     {
