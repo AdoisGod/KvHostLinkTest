@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.ObjectModel;
+using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Threading;
@@ -17,6 +18,11 @@ namespace KVNC1EPTestApp
         private int monitorStartAddress;
         private int monitorEndAddress;
         private ObservableCollection<AlarmInfo> activeAlarms;
+
+        // Zone監控相關成員變量
+        private ZoneDataManager zoneDataManager;
+        private bool[] previousZoneReadyStates;  // 存儲Zone就緒旗標的前一次狀態
+        private string zoneSavePath = "";
 
         public MainWindow()
         {
@@ -341,6 +347,9 @@ namespace KVNC1EPTestApp
                 monitorTimer.Interval = TimeSpan.FromMilliseconds(interval);
                 monitorTimer.Start();
 
+                // 啟動Zone監控（如果路徑已設置）
+                InitializeZoneMonitoring();
+
                 // 更新UI狀態
                 StartMonitorButton.IsEnabled = false;
                 StopMonitorButton.IsEnabled = true;
@@ -380,6 +389,9 @@ namespace KVNC1EPTestApp
         {
             monitorTimer.Stop();
 
+            // 停止Zone監控
+            StopZoneMonitoring();
+
             // 更新UI狀態
             StartMonitorButton.IsEnabled = true;
             StopMonitorButton.IsEnabled = false;
@@ -398,6 +410,7 @@ namespace KVNC1EPTestApp
             try
             {
                 PerformMonitorScan();
+                MonitorZoneFlags();  // 同時監控Zone旗標
             }
             catch (Exception ex)
             {
@@ -535,6 +548,151 @@ namespace KVNC1EPTestApp
 
             // 記錄到日誌
             LogMessage($"[清除] {addressString}");
+        }
+
+        #endregion
+
+        #region Zone數據監控功能
+
+        /// <summary>
+        /// 選擇路徑按鈕點擊事件
+        /// </summary>
+        private void SelectPathButton_Click(object sender, RoutedEventArgs e)
+        {
+            using (var dialog = new System.Windows.Forms.FolderBrowserDialog())
+            {
+                dialog.Description = "選擇Excel文件保存路徑";
+                dialog.ShowNewFolderButton = true;
+
+                if (!string.IsNullOrEmpty(zoneSavePath))
+                {
+                    dialog.SelectedPath = zoneSavePath;
+                }
+
+                if (dialog.ShowDialog() == System.Windows.Forms.DialogResult.OK)
+                {
+                    zoneSavePath = dialog.SelectedPath;
+                    ZoneSavePathTextBox.Text = zoneSavePath;
+                    LogMessage($"已設置Excel保存路徑: {zoneSavePath}");
+                }
+            }
+        }
+
+        /// <summary>
+        /// 初始化Zone監控（在監控啟動時調用）
+        /// </summary>
+        private void InitializeZoneMonitoring()
+        {
+            if (string.IsNullOrEmpty(zoneSavePath))
+            {
+                return; // 路徑未設置，不啟動Zone監控
+            }
+
+            // 初始化Zone數據管理器
+            EndianMode mode = EndianModeCheckBox.IsChecked == true ? EndianMode.BigEndian : EndianMode.LittleEndian;
+            zoneDataManager = new ZoneDataManager(kvSockets, mode);
+
+            // 初始化Zone就緒旗標狀態緩存（4個Zone）
+            previousZoneReadyStates = new bool[4];
+
+            ZoneStatusTextBlock.Text = "監控中";
+            ZoneStatusTextBlock.Foreground = System.Windows.Media.Brushes.Green;
+            LogMessage("Zone數據監控已啟動");
+        }
+
+        /// <summary>
+        /// 監控Zone就緒旗標（在定時器Tick中調用）
+        /// </summary>
+        private void MonitorZoneFlags()
+        {
+            if (zoneDataManager == null || string.IsNullOrEmpty(zoneSavePath))
+            {
+                return;
+            }
+
+            // 檢查每個Zone的就緒旗標
+            for (int i = 0; i < ZoneConfig.Zones.Length; i++)
+            {
+                var zone = ZoneConfig.Zones[i];
+
+                // 檢查就緒旗標
+                bool currentState = zoneDataManager.CheckReadyFlag(zone.ReadyFlagAddress, out string error);
+
+                if (!string.IsNullOrEmpty(error))
+                {
+                    // 讀取錯誤，記錄日誌
+                    continue;
+                }
+
+                // 檢測上升沿（0->1）
+                if (currentState && !previousZoneReadyStates[i])
+                {
+                    // Zone就緒旗標變為ON，開始讀取數據
+                    OnZoneDataReady(zone);
+                }
+
+                // 更新狀態
+                previousZoneReadyStates[i] = currentState;
+            }
+        }
+
+        /// <summary>
+        /// Zone數據就緒事件處理
+        /// </summary>
+        private void OnZoneDataReady(ZoneInfo zone)
+        {
+            LogMessage($"檢測到 {zone.Name} 就緒旗標 (MR{zone.ReadyFlagAddress})");
+
+            try
+            {
+                // 讀取Zone數據
+                int[] data = zoneDataManager.ReadZoneData(zone, out string readError);
+
+                if (data == null)
+                {
+                    LogMessage($"讀取 {zone.Name} 數據失敗: {readError}");
+                    return;
+                }
+
+                LogMessage($"成功讀取 {zone.Name} 數據，共 {data.Length} 個值");
+
+                // 導出到Excel
+                DateTime timestamp = DateTime.Now;
+                string filePath = ExcelExporter.ExportToExcel(zone, data, zoneSavePath, timestamp);
+
+                LogMessage($"Excel文件已保存: {filePath}");
+
+                // 設置完成旗標
+                bool setResult = zoneDataManager.SetCompleteFlag(zone.CompleteFlagAddress, true, out string setError);
+
+                if (!setResult)
+                {
+                    LogMessage($"設置 {zone.Name} 完成旗標失敗: {setError}");
+                }
+                else
+                {
+                    LogMessage($"已設置 {zone.Name} 完成旗標 (MR{zone.CompleteFlagAddress})");
+                }
+            }
+            catch (Exception ex)
+            {
+                LogMessage($"處理 {zone.Name} 數據時發生異常: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// 停止Zone監控
+        /// </summary>
+        private void StopZoneMonitoring()
+        {
+            if (zoneDataManager != null)
+            {
+                zoneDataManager = null;
+                previousZoneReadyStates = null;
+                ZoneStatusTextBlock.Text = "未啟動";
+                ZoneStatusTextBlock.Foreground = System.Windows.Media.Brushes.Gray;
+                LogMessage("Zone數據監控已停止");
+            }
         }
 
         #endregion

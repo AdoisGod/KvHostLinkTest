@@ -41,6 +41,7 @@
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.Data" />
+    <Reference Include="System.Windows.Forms" />
     <Reference Include="System.Xml" />
     <Reference Include="Microsoft.CSharp" />
     <Reference Include="System.Core" />
@@ -74,6 +75,9 @@
     <Compile Include="AlarmInfo.cs" />
     <Compile Include="AlarmConfig.cs" />
     <Compile Include="RAddressHelper.cs" />
+    <Compile Include="ZoneConfig.cs" />
+    <Compile Include="ZoneDataManager.cs" />
+    <Compile Include="ExcelExporter.cs" />
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Properties\AssemblyInfo.cs">
@@ -106,6 +110,7 @@
     <None Include="KvHostlinkLib.dll">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+    <None Include="packages.config" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>
