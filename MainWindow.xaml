@@ -101,7 +101,7 @@
                 </Grid>
             </TabItem>
 
-            <TabItem Header="PLC控制&PC模擬">
+            <TabItem Header="PLC控制&amp;PC模擬">
                 <Grid Margin="10">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
